@@ -1,0 +1,5 @@
+Items not yet implemented:
+
+    1. Implement transfer recovery (resume) functionality
+    2. Implement transfer overwrite option
+    3. Implement SCP functions

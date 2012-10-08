@@ -1,0 +1,243 @@
+NAME
+    DCY::Utils - Perl module for Easy PGP/SFTP Scripting.
+
+SYNOPSIS
+    use DCY::Utils;
+
+SUB MODULES
+    DCY::Utils::FTP - FTP Tools
+
+    DCY::Utils::PGP - PGP (GnuPG) Tools
+
+    DCY::Utils::Bookmarks - NcFTP bookmark Tools
+
+DESCRIPTION
+    This toolkit Provides utilities for the various perl scripts which send
+    and/or retrieve information between ftp and internal servers.
+
+    At it's core it's primarily a wrapper for the Net::FTP and Net::SCP CPAN
+    modules for easier use in perl scripts.
+
+    Functions return a true value on sucess and undef upon errer. Use the
+    $pkg->error() method to retrieve any error messages.
+
+STRUCTURES
+    FTP Hash
+        The FTP hash is the primary hash used to pass options to the FTP
+        Contstructor.
+
+        It's a hash constructed of the following key=>value pairs:
+
+                HOST     => The HOST or IP address to connect to
+                USER     => The Username to log in as
+                PASS     => The Password to use
+                PASV     => 0 == off, 1 == on
+                PORT     => The FTP port to use (default is 21)
+                RDIR     => The remote directory to CD to once connected
+                LDIR     => The local directory to CD to once connected
+                SFTP     => Set to 1 if you wish to use SFTP instead of FTP
+                IDENTITY => The identity file to use with SFTP (defaults to $HOME/.ssh/identity)
+                RENAME   => If defined, any source files that are
+                            sucessfully retrieved or sent are renamed to
+                            include this as a suffix.  (used to rename files
+                            after a transfer so we don't get them again on
+                            the next run)
+
+    @files list
+        This is just a normal array which contains a list of files you want
+        to work with. The list may include paths relative to RDIR, absolute
+        paths, and/or any valid ftp file patterns.
+
+BASE FUNCTIONS
+    istty()
+        Returns true if the script is currently running from a prompt
+        (interactive) or false if otherwise (e.g. from cron).
+
+    send_mail( $TO, $SUBJECT, @MESSAGE );
+        Sends an email message using /bin/mail.
+
+    Error Queue
+    $pkg->error
+        Returns and clears the last error in scalar context. Returns and
+        then clears all errors when called in list context.
+
+    $pkg->error_clear
+        clears the queue and returns the number of messages cleared.
+
+    $pkg->error_count
+        Returns the number of messages in the queue.
+
+PGP FUNCTIONS
+    Constructor
+        $pgp = DCY::Utils::PGP->new( FileName );
+
+    Methods
+
+        $pkg->file : Set or return the file.
+        $pkg->bin : Set or return the PGP binary (defaults to
+        '/usr/bin/gpg')
+        $pkg->key : Set or return the PGP key (for encrypt).
+        $pkg->password : Set or return the PGP Password (for decrypt).
+        $pkg->options : Set or return the PGP Command Options (don't use
+        unless you're sure you know what you're doing)
+
+    encrypt( PGP_Hex_Key )
+        Encrypts using PGP_Hex_Key (may be ommitted if $pkg->key was used
+        previously to set the recipient key). The proper pgp key must exist
+        on the calling users's keyring.
+
+        Returns true on sucess, undef on failure.
+
+    decrypt( password [, newfile] )
+        Decrypts a pgp encrypted file using password (may omit if
+        $pkg->password was called previously to set the password). The
+        proper pgp key must exist on the calling users's keyring.
+
+        Returns true on sucess, undef on failure.
+
+FTP PACKAGE
+    Constructor
+        $pkg = DCY::Utils::FTP->new( %FTP_HASH )
+
+        Returns an object initialized with an FTP Hash (see STRUCTURES
+        above). This will also open a connection to the URL provided.
+
+        returns undef and puts errors in the Error Queue if there were any
+        problems.
+
+    Methods
+
+        $pkg->host : Returns or sets the HOST entry in the FTP Hash.
+        $pkg->user : Returns or sets the USER entry in the FTP Hash.
+        $pkg->pass : Returns or sets the PASS entry in the FTP Hash. (may
+        also use $pkg->password)
+            Note: You should call $pkg->reconnect if any of the above have
+            changed.
+
+        $pkg->pasv : Returns or sets the PASV entry in the FTP Hash.
+        $pkg->port : Returns or sets the PORT entry in the FTP Hash.
+        $pkg->rdir : Returns or sets the RDIR entry in the FTP Hash.
+        $pkg->ldir : Returns or sets the LDIR entry in the FTP Hash.
+        $pkg->rename : Returns or sets the RENAME entry in the FTP Hash.
+        $pkg->reconnect : Forces a connection to the FTP server
+        $pkg->disconnect : Forces a the class to disconnect from the FTP
+        server (?)
+
+    Functions
+
+        get( @files )
+        put( @files )
+            Transfers all files in the @Files list to either the current or
+            remote directory using the information in bookmark reference.
+
+            @Files is a standard list of files to retrieve and may include
+            the absolute path or a relative path.
+
+            Returns undef on error, 1 on success and > 1 if non-fatal errors
+            were encountered (e.g. Local file already exists).
+
+        ls( @filelist )
+            Validates the files given in @filelist and Returns an array of
+            filenames which exist on the server.
+
+            Returns undef on error.
+
+        list( @files )
+            Returns a reference to an array of long listings (ls -lg) of
+            each file in @Files or every file if @Files is empty or omitted.
+
+            @Files is a standard list of files to retrieve and may include
+            the absolute path or a relative path and shell patterns.
+
+            Returns undef on error or an array ref on success.
+
+        is_ready( @files )
+            Checks a remote FTP site for any files that may still be
+            changing.
+
+            This is useful when watching a remote FTP site for new files, it
+            can be used to be sure the transfer has completed on the remote
+            end before we download.
+
+            @Files is a standard list of files to retrieve and may include
+            the absolute path or a relative path.
+
+            Returns: undef if there was an error. 0 if there were no files.
+            1 if the files are ready. 2 if files are still growing.
+
+Bookmark CLASS
+    Methods
+
+        Constructor
+            $pkg = DCY::Utils::Bookmark->new( $Bookmark_File )
+
+        %hash = $pkg->get()
+            Retrives the contents of the bookamrk file and returns a hash of
+            hashes in the FTP Hash structure.
+
+        print()
+            Prints a report of all bookmarks in Bookmark Hash to STDOUT.
+            Useful for looking up bookmarks.
+
+EXAMPLES
+    Bookmarks example
+        Prints the HOST associated with all bookmark entries in the file
+        ".ncftp/bookmarks"
+
+            #!/usr/bin/perl -w
+
+            use DCY::Utils;
+
+            my $Bookmark_OBJ = DCY::Utils::Bookmarks->new( '.ncftp/bookmarks' );
+            my $Bookmarks = $Bookmark_OBJ->get;
+
+            foreach my $Key ( sort keys %{$Bookmark} ) {
+                print "The HOST for $Key is $Bookmark->{$Key}{'HOST'}\n";
+            }
+
+    get_ftp example
+        Retrives all files ending in .pgp from /some/directory on the
+        ftp.somedomain.com ftp site.
+
+            #!/usr/bin/perl -w
+
+            use DCY::Utils;
+
+            my @filepattern = q(*.pgp);
+            my %ftphash = (
+                'HOST' => q(ftp.somedomain.com),
+                'USER' => q(ftpuser),
+                'PASS' => q(ftppassword),
+                'RDIR' => q(/some/directory),
+            );
+
+            my $ftp = DCY::Utils::FTP->new( \%ftphash )
+                or die $ftp->error;
+
+            my $ready = $ftp->is_ready( @filepattern )
+                or die $ftp->error;
+
+            print "There aren't any files matching @filepattern\n" and exit if not $ready;
+
+            foreach my $file ( $ftp->ls( @filepattern ) ) {
+                $ftp->get( $file ) or die $ftp->error;
+
+                # Print any non fatal messages that may be in the error queue
+                # such as "file already exists".
+                print map { "$_\n" } $ftp->error if $ftp->error_count;
+            }
+
+SEE ALSO
+    This modules relies heavily on Net::FTP & Net::SCP to provide the core
+    functionality.
+
+AUTHOR
+    Donovan C. Young, <dyoung522@gmail.com>
+
+COPYRIGHT AND LICENSE
+    Copyright (C) 2008 by Donovan C. Young
+
+    This library is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself, either Perl version 5.8.5 or, at
+    your option, any later version of Perl 5 you may have available.
+

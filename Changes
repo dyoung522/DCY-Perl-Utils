@@ -1,0 +1,10 @@
+Revision history for Perl extension DCY::Utils.
+
+0.01  Fri Apr 18 10:38:52 2008
+	- original version; created by h2xs 1.23 with options
+		-X -n DCY::Utils
+
+0.10  Sat Apr 19 01:36:24 2008
+    - First fully function alpha
+
+
